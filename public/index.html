@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='6' fill='%234f46e5'/%3E%3Cpath d='M9 16.5l5 5L23 11' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-left">
+        <h1>Task Tracker</h1>
+        <span class="subtitle">Daily Productivity Logger</span>
+      </div>
+      <div class="header-right">
+        <span id="sync-status" class="sync-badge disconnected">Not Connected</span>
+        <button id="btn-refresh" class="btn-icon hidden" title="Refresh from Sheet">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        </button>
+        <button id="btn-projects" class="btn-icon" title="Manage Projects">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button id="btn-settings" class="btn-icon" title="Google Sheet Settings">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="tasks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Tasks
+      </button>
+      <button class="tab-btn" data-tab="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Dashboard
+      </button>
+    </nav>
+
+    <!-- Projects Panel -->
+    <div id="projects-panel" class="panel hidden">
+      <div class="panel-header">
+        <h2>Manage Projects</h2>
+        <button id="btn-close-projects" class="btn-icon" title="Close">&times;</button>
+      </div>
+      <div class="panel-body">
+        <form id="project-form" class="project-add-form">
+          <input type="text" id="project-name-input" placeholder="New project name..." required />
+          <input type="color" id="project-color-input" value="#6366f1" title="Pick color" />
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        </form>
+        <div id="project-list-manage" class="project-list-manage">
+          <p class="empty-state-sm">No projects yet. Add one above.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="panel hidden">
+      <div class="panel-header">
+        <h2>Connect Google Sheet</h2>
+        <button id="btn-close-settings" class="btn-icon" title="Close">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div id="connection-status-detail" class="connection-detail"></div>
+
+        <div class="setup-guide">
+          <h3>Setup Instructions</h3>
+          <ol>
+            <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a></li>
+            <li>Create a new project (or select an existing one)</li>
+            <li>Enable the <strong>Google Sheets API</strong> under APIs &amp; Services</li>
+            <li>Go to <strong>Credentials</strong> &rarr; Create Credentials &rarr; <strong>Service Account</strong></li>
+            <li>Give it a name, then click <strong>Done</strong></li>
+            <li>Click the service account &rarr; <strong>Keys</strong> tab &rarr; Add Key &rarr; <strong>JSON</strong></li>
+            <li>Download the JSON key file</li>
+            <li>Create a Google Sheet and share it with the service account email (with <strong>Editor</strong> access)</li>
+            <li>Copy the Sheet ID from the URL: <code>docs.google.com/spreadsheets/d/<strong>{SHEET_ID}</strong>/edit</code></li>
+          </ol>
+        </div>
+
+        <form id="config-form">
+          <div class="form-group">
+            <label for="spreadsheet-id">Google Sheet ID</label>
+            <input type="text" id="spreadsheet-id" placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" required />
+          </div>
+          <div class="form-group">
+            <label for="sheet-name">Sheet Tab Name <span class="optional">(optional, defaults to "Tasks")</span></label>
+            <input type="text" id="sheet-name" placeholder="Tasks" />
+          </div>
+          <div class="form-group">
+            <label for="credentials-json">Service Account JSON Key</label>
+            <textarea id="credentials-json" rows="6" placeholder="Paste the entire contents of your downloaded JSON key file here..." required></textarea>
+            <small>Or <label for="credentials-file" class="file-label">upload the JSON file</label></small>
+            <input type="file" id="credentials-file" accept=".json" class="hidden" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-connect">Connect Sheet</button>
+            <button type="button" class="btn btn-danger hidden" id="btn-disconnect">Disconnect</button>
+          </div>
+          <div id="config-message" class="message hidden"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Connect Banner (shown when no sheet) -->
+    <div id="connect-banner" class="connect-banner">
+      <div class="connect-banner-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+      </div>
+      <h2>Connect a Google Sheet to get started</h2>
+      <p>All tasks and projects are stored in your Google Sheet. Click the settings icon above to connect one.</p>
+      <button class="btn btn-primary" id="btn-open-settings">Connect Google Sheet</button>
+    </div>
+
+    <!-- ===== TASKS TAB ===== -->
+    <div id="tab-tasks" class="tab-content hidden">
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-value" id="stat-total">0</span>
+        <span class="stat-label">Total Tasks</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-completed">0</span>
+        <span class="stat-label">Completed</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-in-progress">0</span>
+        <span class="stat-label">In Progress</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-todo">0</span>
+        <span class="stat-label">To-Do</span>
+      </div>
+    </div>
+
+    <!-- Toolbar: Add button + View Toggle + Sort -->
+    <div class="tasks-toolbar">
+      <button id="btn-add-task" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        Add Task
+      </button>
+      <div class="toolbar-right">
+        <div class="sort-toggle">
+          <button id="btn-sort" class="btn btn-sm btn-secondary" title="Toggle sort order">
+            <svg id="sort-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>
+            Newest First
+          </button>
+        </div>
+        <div class="view-toggle">
+          <button class="btn btn-sm view-btn active" data-view="list">List View</button>
+          <button class="btn btn-sm view-btn" data-view="project">Project View</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <input type="text" id="filter-search" placeholder="Search tasks..." />
+      <select id="filter-project">
+        <option value="">All Projects</option>
+      </select>
+      <select id="filter-category">
+        <option value="">All Categories</option>
+        <option value="To-Do">To-Do</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Completed">Completed</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Review">Review</option>
+      </select>
+      <select id="filter-status">
+        <option value="">All Statuses</option>
+        <option value="Not Started">Not Started</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Done">Done</option>
+        <option value="Blocked">Blocked</option>
+      </select>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="date-range-bar">
+      <div class="date-range-group">
+        <label for="filter-date-from">From</label>
+        <input type="date" id="filter-date-from" />
+      </div>
+      <div class="date-range-group">
+        <label for="filter-date-to">To</label>
+        <input type="date" id="filter-date-to" />
+      </div>
+      <button id="btn-clear-dates" class="btn btn-sm btn-secondary">Clear Dates</button>
+    </div>
+
+    <!-- Task List (list view) -->
+    <div id="list-view">
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Tasks</h2>
+          <span id="task-count-label" class="task-count-label"></span>
+        </div>
+        <div id="task-list" class="task-list">
+          <p class="empty-state">No tasks yet. Click "Add Task" to get started.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project Board (project view) -->
+    <div id="project-view" class="hidden">
+      <div id="project-board" class="project-board"></div>
+    </div>
+
+    </div><!-- /tab-tasks -->
+
+    <!-- ===== DASHBOARD TAB ===== -->
+    <div id="tab-dashboard" class="tab-content hidden">
+
+      <!-- Dashboard Stats -->
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-value" id="dash-total">0</span>
+          <span class="stat-label">Total Tasks</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="dash-completed">0</span>
+          <span class="stat-label">Completed</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="dash-in-progress">0</span>
+          <span class="stat-label">In Progress</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="dash-completion-rate">0%</span>
+          <span class="stat-label">Completion Rate</span>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="card">
+        <div class="chart-header">
+          <h2>Productivity Overview</h2>
+          <div class="chart-range-toggle">
+            <button class="btn btn-sm range-btn active" data-range="7">7 Days</button>
+            <button class="btn btn-sm range-btn" data-range="14">14 Days</button>
+            <button class="btn btn-sm range-btn" data-range="30">30 Days</button>
+            <button class="btn btn-sm range-btn" data-range="0">All Time</button>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-container chart-wide">
+            <canvas id="chart-daily"></canvas>
+          </div>
+          <div class="chart-container chart-wide">
+            <canvas id="chart-trend"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-category"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-Project Breakdown -->
+      <div class="card">
+        <h2>Project Breakdown</h2>
+        <div class="charts-grid">
+          <div class="chart-container chart-wide">
+            <canvas id="chart-projects"></canvas>
+          </div>
+          <div class="chart-container chart-wide">
+            <canvas id="chart-project-status"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project Summary Table -->
+      <div class="card">
+        <h2>Project Summary</h2>
+        <div id="project-summary-table"></div>
+      </div>
+
+    </div><!-- /tab-dashboard -->
+
+  </div>
+
+  <!-- Add Task Modal -->
+  <div id="add-task-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="panel-header">
+        <h2>Log New Task</h2>
+        <button id="btn-close-add" class="btn-icon" title="Close">&times;</button>
+      </div>
+      <form id="task-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-date">Date</label>
+            <input type="date" id="task-date" required />
+          </div>
+          <div class="form-group">
+            <label for="task-project">Project</label>
+            <select id="task-project" required>
+              <option value="">Select a project...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="task-description">Task Description</label>
+          <textarea id="task-description" rows="2" placeholder="What did you work on?" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-category">Category</label>
+            <select id="task-category">
+              <option value="To-Do">To-Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Review">Review</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-status">Status</label>
+            <select id="task-status">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Add Task</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="preview-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="panel-header">
+        <h2>Task Details</h2>
+        <button id="btn-close-preview" class="btn-icon" title="Close">&times;</button>
+      </div>
+      <div class="preview-body">
+        <div class="preview-top-row">
+          <div id="preview-project" class="project-tag"></div>
+          <div class="preview-badges">
+            <span id="preview-category" class="badge"></span>
+            <span id="preview-status" class="badge"></span>
+          </div>
+        </div>
+        <div class="preview-field">
+          <span class="preview-label">Date</span>
+          <span id="preview-date" class="preview-value"></span>
+        </div>
+        <div class="preview-field">
+          <span class="preview-label">Description</span>
+          <p id="preview-description" class="preview-value preview-desc-text"></p>
+        </div>
+        <div class="preview-actions">
+          <button id="btn-preview-edit" class="btn btn-primary">Edit Task</button>
+          <button id="btn-preview-delete" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="panel-header">
+        <h2>Edit Task</h2>
+        <button id="btn-close-modal" class="btn-icon" title="Close">&times;</button>
+      </div>
+      <form id="edit-form">
+        <input type="hidden" id="edit-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-date">Date</label>
+            <input type="date" id="edit-date" required />
+          </div>
+          <div class="form-group">
+            <label for="edit-project">Project</label>
+            <select id="edit-project" required>
+              <option value="">Select a project...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-description">Task Description</label>
+          <textarea id="edit-description" rows="2" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-category">Category</label>
+            <select id="edit-category">
+              <option value="To-Do">To-Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Review">Review</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="edit-status">Status</label>
+            <select id="edit-status">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancel-edit">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
