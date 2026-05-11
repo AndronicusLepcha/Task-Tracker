@@ -2,16 +2,33 @@ require("dotenv").config();
 const express = require("express");
 const { google } = require("googleapis");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+const SESSION_FILE = path.join(__dirname, ".session.json");
 
 let sheetsConfig = {
   spreadsheetId: null,
   credentials: null,
   sheetName: "Tasks",
 };
+
+function saveSession() {
+  try {
+    fs.writeFileSync(SESSION_FILE, JSON.stringify({
+      spreadsheetId: sheetsConfig.spreadsheetId,
+      credentials: sheetsConfig.credentials,
+      sheetName: sheetsConfig.sheetName,
+    }), "utf8");
+  } catch (_) {}
+}
+
+function clearSession() {
+  try { fs.unlinkSync(SESSION_FILE); } catch (_) {}
+}
 
 let localTasks = [];
 let nextId = 1;
@@ -212,6 +229,7 @@ app.post("/api/config/connect", async (req, res) => {
     const sheets = getSheetsClient();
     await loadProjectsFromSheet(sheets);
     await loadFromSheet(sheets);
+    saveSession();
 
     res.json({
       success: true,
@@ -249,6 +267,7 @@ app.post("/api/config/disconnect", (req, res) => {
   projects = [];
   nextId = 1;
   nextProjectId = 1;
+  clearSession();
   res.json({ success: true });
 });
 
@@ -415,7 +434,28 @@ app.delete("/api/projects/:id", requireSheet, async (req, res) => {
   res.json({ success: true });
 });
 
+async function restoreSession() {
+  try {
+    if (!fs.existsSync(SESSION_FILE)) return;
+    const data = JSON.parse(fs.readFileSync(SESSION_FILE, "utf8"));
+    if (!data.spreadsheetId || !data.credentials) return;
+    sheetsConfig.spreadsheetId = data.spreadsheetId;
+    sheetsConfig.credentials = data.credentials;
+    if (data.sheetName) sheetsConfig.sheetName = data.sheetName;
+    const sheets = getSheetsClient();
+    await loadProjectsFromSheet(sheets);
+    await loadFromSheet(sheets);
+    console.log(`Session restored: ${localTasks.length} tasks, ${projects.length} projects`);
+  } catch (err) {
+    console.error("Failed to restore session:", err.message);
+    sheetsConfig.credentials = null;
+    sheetsConfig.spreadsheetId = null;
+  }
+}
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Task Tracker running at http://localhost:${PORT}`);
+restoreSession().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Task Tracker running at http://localhost:${PORT}`);
+  });
 });

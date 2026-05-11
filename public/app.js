@@ -396,7 +396,7 @@ async function saveEdit(e) {
     if (idx !== -1) tasks[idx] = updatedTask;
     renderAll();
     renderProjectList();
-    closeModal();
+    closeEditModal();
   } catch (e) {
     alert("Error updating task: " + e.message);
   }
