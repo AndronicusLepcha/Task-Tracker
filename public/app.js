@@ -15,9 +15,37 @@ let sortOrder = "desc";
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", () => {
-  checkConnection().then(() => {
+  checkConnection().then(async () => {
     if (sheetConnected) {
-      loadProjects().then(() => loadTasks());
+      await loadProjects();
+      await loadTasks();
+    } else {
+      const savedCreds = localStorage.getItem("tt_credentials");
+      const savedSheet = localStorage.getItem("tt_spreadsheetId");
+      if (savedCreds && savedSheet) {
+        try {
+          const res = await fetch(`${API}/api/config/connect`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              spreadsheetId: savedSheet,
+              credentials: savedCreds,
+              sheetName: localStorage.getItem("tt_sheetName") || undefined,
+            }),
+          });
+          if (res.ok) {
+            await checkConnection();
+            await loadProjects();
+            await loadTasks();
+          } else {
+            localStorage.removeItem("tt_spreadsheetId");
+            localStorage.removeItem("tt_credentials");
+            localStorage.removeItem("tt_sheetName");
+          }
+        } catch (e) {
+          console.error("Auto-connect from saved credentials failed:", e);
+        }
+      }
     }
   });
   bindEvents();
@@ -278,18 +306,22 @@ async function connectSheet(e) {
   btn.classList.add("loading");
   btn.textContent = "Connecting...";
 
+  const spreadsheetId = $("#spreadsheet-id").value.trim();
+  const credentials = $("#credentials-json").value.trim();
+  const sheetName = $("#sheet-name").value.trim() || undefined;
+
   try {
     const res = await fetch(`${API}/api/config/connect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        spreadsheetId: $("#spreadsheet-id").value.trim(),
-        credentials: $("#credentials-json").value.trim(),
-        sheetName: $("#sheet-name").value.trim() || undefined,
-      }),
+      body: JSON.stringify({ spreadsheetId, credentials, sheetName }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
+
+    localStorage.setItem("tt_spreadsheetId", spreadsheetId);
+    localStorage.setItem("tt_credentials", credentials);
+    if (sheetName) localStorage.setItem("tt_sheetName", sheetName);
 
     showMessage("config-message", `Connected! ${data.tasksLoaded} tasks, ${data.projectsLoaded || 0} projects loaded.`, "success");
     await checkConnection();
@@ -321,6 +353,9 @@ async function refreshFromSheet() {
 
 async function disconnectSheet() {
   try {
+    localStorage.removeItem("tt_spreadsheetId");
+    localStorage.removeItem("tt_credentials");
+    localStorage.removeItem("tt_sheetName");
     await fetch(`${API}/api/config/disconnect`, { method: "POST" });
     await checkConnection();
     showMessage("config-message", "Disconnected. All data cleared from local view.", "success");
